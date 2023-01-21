@@ -18,8 +18,6 @@ import __main__
 
 #----------------------------------------- Variable ------------------------------------------
 EXEC_PARA  ='N/A'
-INPUT_PATH = r'D:\Workspace\CPF-IT\bin\00_pre-input'
-POST_PATH  = r'D:\Workspace\CPF-IT\bin\01_input'
 EXEC_PARA='-f <Config file>'
 
 #----------------------------------------- Logging ------------------------------------------
