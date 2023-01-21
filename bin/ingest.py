@@ -60,51 +60,6 @@ def _statistic(start_time) :
     Finish_time = time.time()
     return(Finish_time - start_time)
 
-def _filename_output(filename) :
-    """
-    Given pattern filename, return filename after replace fomula.
-
-    :param filename: filename pattern
-    :return: filename after calculate on fomula
-
-    >>> _filename_output("CUS_{YYYYMMDD_HHMMSS}.txt") # doctest: +ELLIPSIS
-    'CUS_2..._....txt'
-    >>> _filename_output("CUS_{YYYYMMDD_HHMM}.txt") # doctest: +ELLIPSIS 
-    'CUS_2..._....txt'
-    >>> _filename_output("CUS_{YYYYMMDD_HH}.txt") # doctest: +ELLIPSIS 
-    'CUS_2..._....txt'
-    >>> _filename_output("CUS_{YYYYMMDD}.txt") # doctest: +ELLIPSIS 
-    'CUS_2....txt'
-    >>> _filename_output("CUS_{ERROR}.txt")  # doctest: +ELLIPSIS
-    Traceback (most recent call last):
-        ...
-    ValueError: Error Unknow pattern filename ...
-    """
-
-
-    if "{YYYYMMDD_HHMMSS}" in filename :
-        out_filename = filename.replace('{YYYYMMDD_HHMMSS}',datetime.today().strftime('%Y%m%d_%H%M%S'))
-    elif "{YYYYMMDD_HHMM}" in filename :
-        out_filename = filename.replace('{YYYYMMDD_HHMM}',datetime.today().strftime('%Y%m%d_%H%M'))
-    elif "{YYYYMMDD_HH}" in filename :
-        out_filename = filename.replace('{YYYYMMDD_HH}',datetime.today().strftime('%Y%m%d_%H'))
-    elif "{YYYYMMDD}" in filename :
-        out_filename = filename.replace('{YYYYMMDD}',datetime.today().strftime('%Y%m%d'))
-    elif "{YYYYMM}" in filename :
-        out_filename = filename.replace('{YYYYMM}',datetime.today().strftime('%Y%m'))
-    else:
-        raise ValueError("Error Unknow pattern filename {}".format(filename))
-        print("Error Unknow pattern filename {}".format(filename))
-        print("Supports only ")
-        print(" 1. X...X_{YYYYMMDD_HHMMSS}")
-        print(" 2. X...X_{YYYYMMDD_HHMM}")
-        print(" 3. X...X_{YYYYMMDD_HH}")
-        print(" 4. X...X_{YYYYMMDD}")
-        print(" 5. X...X_{YYYYMM}")
-        sys.exit(2)
-
-    return(out_filename)
-
 def _delimeter(config_delimeter) :
     """_summary_
 
