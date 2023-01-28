@@ -28,3 +28,44 @@ Prerequisite
 - Python module doctest
 - Docker Desktop 20.x.x or Lasted version
 - Docker image Database Mariadb 10.9.4
+
+6 Steps prepare database & execute data ingest by Python
+------------------
+1. Download script from Git
+2. Manage Stack Database MariaDB
+3. Setup Module Python
+4. Execute Unit Test by doctest
+5. ingest data into table STG_DB.CUSTOMER
+6. ingest data into table STG_DB.VENDOR
+
+
+Step 1 Download script from Git
+------------------
+
+    git clone https://github.com/kul1977/push2see_ingest.git
+
+
+Step 2 Start Database
+------------------
+
+    docker-compose -f db\mariadb\docker-compose.yml up -d
+    
+Step 3 Setup Module Python
+------------------
+
+    python -m venv env
+    env/Scripts/activate.bat (Window)
+    env/Scripts/activate.sh (Linux,MacOS)
+    
+Step 4 Execute Unit Test by doctest
+------------------
+    
+    python bin\ingest.py --test
+    
+
+Step 5 ingest data into table STG_DB.CUSTOMER
+------------------
+
+    python bin\ingest.py -f conf\config.ini -t Customer
+    
+    
