@@ -1,4 +1,4 @@
-This is Example Project Data Ingest version 0.1.0 Push2See_IngesT
+This is Example Project Data Ingest version 0.1.0 Push2See_IngesTion
 =====================================
 
 General Information
