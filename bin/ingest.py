@@ -13,13 +13,20 @@ import time
 import glob
 import configparser
 #from faker import Faker
+
+# import sqlalchemy
 import mariadb
+
+import cx_Oracle
+cx_Oracle.init_oracle_client(lib_dir=r"D:\Workspace\push2see_ingest\db\oracle\instantclient_21_8")
+
 import __main__
 
 #----------------------------------------- Variable ------------------------------------------
 EXEC_PARA  ='N/A'
 EXEC_PARA='-f <Config file>'
-
+conn = None
+iRet = 0
 #----------------------------------------- Logging ------------------------------------------
 # logging.basicConfig()
 
@@ -94,14 +101,19 @@ def _db_create_db(db_conn,sql_create_db) :
     Args:
         :param db_conn: database connection
                sql_create_db: sql create database
+        :cx_Oracle sql statement don't require ';' end of SQL Statement
         :returns: no
             
-    >>> _db_create_db(_db_connect('Mariadb'),"CREATE DATABASE IF NOT EXISTS STG_TEST_1;")
-    >>> _db_create_db(_db_connect('Mariadb'),"CREATE DATABASE IF NOT EXISTS STG_TEST_2;")
-    >>> _db_create_db(_db_connect('Mariadb'),"CREATE DATABASE IF NOT EXISTS STG_DB;")
-    >>> _db_create_db(_db_connect('Mariadb'),"DROP DATABASE IF EXISTS STG_TEST_1;")
-    >>> _db_create_db(_db_connect('Mariadb'),"DROP DATABASE IF EXISTS STG_TEST_2;")
-    >>> _db_create_db(_db_connect('Mariadb'),"DROP DATABASE IF EXISTS STG_DB;")
+    >>> _db_create_db(_db_connect('Mariadb','127.0.0.1','root','example',3306),"CREATE DATABASE IF NOT EXISTS STG_TEST_1;")
+    >>> _db_create_db(_db_connect('Mariadb','127.0.0.1','root','example',3306),"CREATE DATABASE IF NOT EXISTS STG_TEST_2;")
+    >>> _db_create_db(_db_connect('Mariadb','127.0.0.1','root','example',3306),"CREATE DATABASE IF NOT EXISTS STG_DB;")
+    >>> _db_create_db(_db_connect('Mariadb','127.0.0.1','root','example',3306),"DROP DATABASE IF EXISTS STG_TEST_1;")
+    >>> _db_create_db(_db_connect('Mariadb','127.0.0.1','root','example',3306),"DROP DATABASE IF EXISTS STG_TEST_2;")
+    >>> _db_create_db(_db_connect('Mariadb','127.0.0.1','root','example',3306),"DROP DATABASE IF EXISTS STG_DB;")
+
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE USER STG_TEST_1 IDENTIFIED BY password")    
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"DROP USER STG_TEST_1 CASCADE")
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"DROP USER STG_DB CASCADE")
     """
 
     try:    
@@ -109,8 +121,11 @@ def _db_create_db(db_conn,sql_create_db) :
     except mariadb.Error as e:
         log.error(f"Error connecting to MariaDB Platform: {e}")
         sys.exit(1)                
-    except:
-        # log.error('usage: {} -f <config file>'.format(sys.argv[0]))
+    except cx_Oracle.Error as e:
+        log.error(f"Error connecting to Oracle Platform: {e}")
+        sys.exit(1)                   
+    except Exception as e:
+        log.error('Other error {} {}'.format(type(e),e))
         # _usage(sys.argv)
         sys.exit(2)
 
@@ -121,17 +136,25 @@ def _db_create_tb(db_conn,sql_create_tb) :
                sql_create_db: sql create database
         :returns: no
             
-    >>> _db_create_db(_db_connect('Mariadb'),"CREATE DATABASE IF NOT EXISTS STG_DB;")
-    >>> _db_create_tb(_db_connect('Mariadb'),"CREATE TABLE IF NOT EXISTS STG_DB.TEST (test int);")
-    >>> _db_create_tb(_db_connect('Mariadb'),"DROP TABLE IF EXISTS STG_DB.TEST;")
+    >>> _db_create_db(_db_connect('Mariadb','127.0.0.1','root','example',3306),"CREATE DATABASE IF NOT EXISTS STG_DB;")
+    >>> _db_create_tb(_db_connect('Mariadb','127.0.0.1','root','example',3306),"CREATE TABLE IF NOT EXISTS STG_DB.TEST (test int);")
+    >>> _db_create_tb(_db_connect('Mariadb','127.0.0.1','root','example',3306),"DROP TABLE IF EXISTS STG_DB.TEST;")
+
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE USER STG_TEST_1 IDENTIFIED BY password")
+    >>> _db_create_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"GRANT UNLIMITED TABLESPACE TO STG_TEST_1")
+    >>> _db_create_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE TABLE STG_TEST_1.TEST(test int)")
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"DROP USER STG_TEST_1 CASCADE")
     """    
-    try:    
-        db_conn.execute(sql_create_tb)
+    try:
+        db_conn.execute(sql_create_tb)        
     except mariadb.Error as e:
         log.error(f"Error connecting to MariaDB Platform: {e}")
         sys.exit(1)                
-    except:
-        # log.error('usage: {} -f <config file>'.format(sys.argv[0]))
+    except cx_Oracle.Error as e:
+        log.error(f"Error connecting to Oracle Platform: {e}")
+        sys.exit(1)                     
+    except Exception as e:
+        log.error('Other error {} {}'.format(type(e),e))
         # _usage(sys.argv)
         sys.exit(2)        
 
@@ -142,9 +165,15 @@ def _db_delete_tb(db_conn,sql_delete_tb) :
                sql_delete_tb: sql delete database
         :returns: no
             
-    >>> _db_create_tb(_db_connect('Mariadb'),"CREATE TABLE IF NOT EXISTS STG_DB.TEST (test int);")
-    >>> _db_delete_tb(_db_connect('Mariadb'),"TRUNCATE TABLE STG_DB.TEST;")
-    >>> _db_create_tb(_db_connect('Mariadb'),"DROP TABLE IF EXISTS STG_DB.TEST;")
+    >>> _db_create_tb(_db_connect('Mariadb','127.0.0.1','root','example',3306),"CREATE TABLE IF NOT EXISTS STG_DB.TEST (test int);")
+    >>> _db_delete_tb(_db_connect('Mariadb','127.0.0.1','root','example',3306),"TRUNCATE TABLE STG_DB.TEST;")
+    >>> _db_create_tb(_db_connect('Mariadb','127.0.0.1','root','example',3306),"DROP TABLE IF EXISTS STG_DB.TEST;")
+
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE USER STG_TEST_1 IDENTIFIED BY password")    
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"GRANT UNLIMITED TABLESPACE TO STG_TEST_1")    
+    >>> _db_create_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE TABLE STG_TEST_1.TEST(test int)")
+    >>> _db_delete_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"TRUNCATE TABLE STG_TEST_1.TEST")
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"DROP USER STG_TEST_1 CASCADE")
     """    
 
     try:    
@@ -152,8 +181,8 @@ def _db_delete_tb(db_conn,sql_delete_tb) :
     except mariadb.Error as e:
         log.error(f"Error connecting to MariaDB Platform: {e}")
         sys.exit(1)                
-    except:
-        # log.error('usage: {} -f <config file>'.format(sys.argv[0]))
+    except Exception as e:
+        log.error('Other error {} {}'.format(type(e),e))
         # _usage(sys.argv)
         sys.exit(2)                
 
@@ -164,10 +193,16 @@ def _db_ingest_file(db_conn,sql_bulk_load) :
                sql_bulk_load: sql bulk load
         :returns: number of record
             
-    >>> _db_create_tb(_db_connect('Mariadb'),"CREATE TABLE IF NOT EXISTS STG_DB.TEST (test int);")
-    >>> _db_ingest_file(_db_connect('Mariadb'),SQL_BLUK_LOAD)
+    >>> _db_create_tb(_db_connect('Mariadb','127.0.0.1','root','example',3306),"CREATE TABLE IF NOT EXISTS STG_DB.TEST (test int);")
+    >>> _db_ingest_file(_db_connect('Mariadb','127.0.0.1','root','example',3306),SQL_BLUK_LOAD)
     10
-    >>> _db_create_db(_db_connect('Mariadb'),"DROP DATABASE IF EXISTS STG_DB;")
+    >>> _db_create_db(_db_connect('Mariadb','127.0.0.1','root','example',3306),"DROP DATABASE IF EXISTS STG_DB;")
+
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE USER STG_TEST_1 IDENTIFIED BY password")    
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"GRANT UNLIMITED TABLESPACE TO STG_TEST_1")    
+    >>> _db_create_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE TABLE STG_TEST_1.TEST(test int)")
+    >>> _db_delete_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"TRUNCATE TABLE STG_TEST_1.TEST")
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"DROP USER STG_TEST_1 CASCADE")
     """    
 
     try:            
@@ -178,12 +213,60 @@ def _db_ingest_file(db_conn,sql_bulk_load) :
     except mariadb.Error as e:
         log.error(f"Error MariaDB Platform: {e}")
         sys.exit(1)                
-    except:
-        log.error('usage: {} -f <config file>'.format(sys.argv[0]))
+    except Exception as e:
+        log.error('Other error {} {}'.format(type(e),e))
         # _usage(sys.argv)
         sys.exit(2)         
 
-def _db_connect(db_type) :
+def _db_ingest_records(db_conn,sql_bulk_load,DataFrame) :
+    """
+    Args:
+        :param db_conn: database connection
+               sql_bulk_load: sql bulk load
+        :returns: number of record
+            
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE USER STG_TEST_1 IDENTIFIED BY password")    
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"GRANT UNLIMITED TABLESPACE TO STG_TEST_1")    
+    >>> _db_create_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE TABLE STG_TEST_1.TEST(test int)")
+    >>> _db_delete_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"TRUNCATE TABLE STG_TEST_1.TEST")
+    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"DROP USER STG_TEST_1 CASCADE")
+    """    
+
+    try:            
+        # Creating a list of tupples from the dataframe values
+        tpls = [tuple(x) for x in DataFrame.to_numpy()]
+
+        # print(sql_bulk_load)
+        db_conn.prepare(sql_bulk_load)
+        db_conn.executemany(None,tpls)
+
+        # for i in DataFrame.index:
+        #     cols  = ','.join(list(DataFrame.columns))
+        #     vals  = [DataFrame.at[i,col] for col in list(DataFrame.columns)]
+        #     query = """
+        #             INSERT INTO STG_DB.CUSTOMER
+        #             (ID,NAME,CITY,ZIPCODE,BBAN,LOCALE,BANK_COUNTRY,IBAN,COUNTRY_CALLING_CODE,MSISDN,PHONE_NUMBER,PYFLOAT,ANDROID_PLATFORM_TOKEN)
+        #             VALUES
+        #             ('{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}')
+        #             """.format(vals[0],vals[1],vals[2],vals[3] ,vals[4] ,vals[5],vals[6],
+        #                        vals[7],vals[8],vals[9],vals[10],vals[11],vals[12])
+        #     db_conn.execute(query)        
+        
+        # log.info("{:0,.0f} record(s) on RowCount".format(db_conn.rowcount))        
+        return db_conn.rowcount
+    except mariadb.Error as e:
+        log.error(f"Error MariaDB Platform: {e}")
+        sys.exit(1)                
+    except cx_Oracle.Error as e:
+        log.error(f"Error Oracle Platform: {e}")
+        sys.exit(1)                
+    except Exception as e:
+        log.error('Other error {} {}'.format(type(e),e))
+        # _usage(sys.argv)
+        sys.exit(2)         
+
+
+def _db_connect(db_type,host_db,user_db,pass_db,port_db) :
 
     """
     Args:
@@ -191,40 +274,58 @@ def _db_connect(db_type) :
                stg_db: database
         :returns: database connection
             
-    >>> _db_connect('Mariadb') # doctest: +ELLIPSIS
+    >>> _db_connect('Mariadb','127.0.0.1','root','example',3306) # doctest: +ELLIPSIS
     <mariadb.connection.cursor object at ...
-    >>> _db_connect('NONO') # doctest: +ELLIPSIS
+    >>> _db_connect('NONO','127.0.0.1','root','example',3306) # doctest: +ELLIPSIS
     Traceback (most recent call last):
         ...
     SystemExit: 2
+
+    >>> _db_connect('Oracle','127.0.0.1:1521/xe','system','oracle','1521') # doctest: +ELLIPSIS
+    <cx_Oracle.Cursor on <cx_Oracle.Connection to ...
     """
 
     try:
         if db_type == "Mariadb":
             # Connect to MariaDB Platform
             conn = mariadb.connect(
-                user="root",
-                password="example",
-                host="127.0.0.1",
-                port=3306,
+                user=user_db,
+                password=pass_db,
+                host=host_db,
+                port=port_db,
                 autocommit=True,
-                local_infile = 1                
+                local_infile = 1
                 # database=stg_db
-            )            
+            )        
+        elif db_type == "Oracle":
+            conn = cx_Oracle.connect(
+                user=user_db,
+                password=pass_db,
+                dsn=host_db,
+                encoding="UTF-8")
+
+            conn.autocommit = True
+
+            # log.info("Database version: {}".format(conn.version))
+            # log.info("Client version: {}".format(cx_Oracle.clientversion()))
+
         else:
             log.error("No DB Supports")
             sys.exit(2)
 
         # opts, args = getopt.getopt(sys.argv[1:],"hvf:t:d:",["conf=","type=","test"])
     except mariadb.Error as e:
-        log.error(f"Error connecting to MariaDB Platform: {e}")
+        log.error(f"Error connecting to MariaDB Platform: {e}")    
         sys.exit(1)        
-    except:
-        # log.error('usage: {} -f <config file>'.format(sys.argv[0]))
+    except cx_Oracle.Error as e:
+        log.error(f"Error connecting to Oracle Platform: {e}")
+        sys.exit(1)        
+    except Exception as e:
+        log.error('Other error {} {}'.format(type(e),e))
         # _usage(sys.argv)
         sys.exit(2)
 
-    # return Cursor
+    # return Cursor    
     return conn.cursor()
 
 #------------------------------------------ Argment ------------------------------------------
@@ -351,9 +452,15 @@ else:
     log.info('-----------------------------------------------------------------')
 
     try:
+        # conn   = None
         db_cur = None
+        DB_HOST = config[DB_TYPE]['HOST_DB']
+        DB_USER_DB = config[DB_TYPE]['USER_DB']
+        DB_PASS_DB = config[DB_TYPE]['PASS_DB']
+        DB_PORT_DB = config[DB_TYPE]['PORT_DB']
 
-        db_cur = _db_connect(DB_TYPE)
+        db_cur = _db_connect(DB_TYPE,DB_HOST,DB_USER_DB,DB_PASS_DB,DB_PORT_DB)
+        # db_cur = conn.cursor()
 
         log.info('Check Database: {} and create if not found'.format(STG_DATABASE))
         SQL_CREATE_DB = SQL_CREATE_DB.replace("{STG_DATABASE}",STG_DATABASE)
@@ -367,24 +474,47 @@ else:
         # read file to dataFrame
         df = pd.read_csv(INPUT_PATH + "\\" + INPUT_FILENAME, sep = DELIMETER)
 
+        if TAILER :
+            log.info('Remove last row because TAILER: {}'.format(TAILER))
+            # remove tailer record
+            df = df[:-1]
+
+
         # iterating the columns
-        list_cols = ""
+        list_cols_create_tb = ""
+        list_cols_insert = ""
+        list_values_insert = ""
+        index = 0
         for col in df.columns:
             # log.info('Column : \'{}\''.format(col))    
             # print("{} VARCHAR(255),".format(col) )
-            list_cols = list_cols + "\t{} VARCHAR(255),".format(col) +"\n"
+            list_cols_create_tb = list_cols_create_tb + "\t{} VARCHAR(255),".format(col) +"\n"            
+            list_cols_insert = list_cols_insert + "{},".format(col)
+            list_values_insert = list_values_insert + ":{},".format(index)
+            index = index + 1
 
         # using negative indexing
-        list_cols = list_cols[:-2]
+        list_cols_create_tb = list_cols_create_tb[:-2]
+        list_cols_insert    = list_cols_insert[:-1]
+        list_values_insert  = list_values_insert[:-1]
         
         SQL_CREATE_TB = SQL_CREATE_TB.replace("{STG_DATABASE}",STG_DATABASE)
         SQL_CREATE_TB = SQL_CREATE_TB.replace("{STG_TABLE}",STG_TABLE)
-        SQL_CREATE_TB = SQL_CREATE_TB.replace("{LIST_COLS}",list_cols)
-        
+        SQL_CREATE_TB = SQL_CREATE_TB.replace("{LIST_COLS}",list_cols_create_tb)
+
+        # Oracle require grant TABLESPACE
+        if DB_TYPE == "Oracle":
+            SQL_GRANT_TABLE_SPACE = config[DB_TYPE]['SQL_GRANT_TABLE_SPACE']
+            SQL_GRANT_TABLE_SPACE = SQL_GRANT_TABLE_SPACE.replace("{STG_DATABASE}",STG_DATABASE)
+
+            log.info('Grant Unlimited Table Space to User: {}'.format(STG_DATABASE))
+            _db_create_tb(db_cur,SQL_GRANT_TABLE_SPACE)
+
         # print(SQL_CREATE_TB)
         log.info('Check Table: {}.{} and create if not found'.format(STG_DATABASE,FILE_TYPE.upper()))
         _db_create_tb(db_cur,SQL_CREATE_TB);        
 
+        
         log.info('-----------------------------------------------------------------')
 
 
@@ -412,9 +542,20 @@ else:
 
         # print(SQL_BLUK_LOAD)
         log.info('-----------------------------------------------------------------')
-        log.info('Loading file: {} into table: {}.{}'.format(INPUT_PATH + "\\" + INPUT_FILENAME,STG_DATABASE,STG_TABLE))
+        
+        log.info('Delete records on table: {}.{}'.format(STG_DATABASE,STG_TABLE))
         _db_delete_tb(db_cur,SQL_TRUNCATE_DB)
-        number_of_record = _db_ingest_file(db_cur,SQL_BLUK_LOAD)
+
+        log.info('Loading file: {} into table: {}.{}'.format(INPUT_PATH + "\\" + INPUT_FILENAME,STG_DATABASE,STG_TABLE))
+        if DB_TYPE == "Mariadb":            
+            number_of_record = _db_ingest_file(db_cur,SQL_BLUK_LOAD)
+        elif DB_TYPE == "Oracle":
+            SQL_BLUK_LOAD = SQL_BLUK_LOAD.replace("{COLS}",list_cols_insert)
+            SQL_BLUK_LOAD = SQL_BLUK_LOAD.replace("{VALUES}",list_values_insert)
+            number_of_record = _db_ingest_records(db_cur,SQL_BLUK_LOAD,df)            
+        else:
+            log.error("No DB Supports")
+            sys.exit(2)            
 
         Duration = _statistic(Start_time)
         log.info('{:0,.0f} record(s) on dataFrame'.format(df_rows))
@@ -434,9 +575,7 @@ else:
             log.info("Done")
         else:
             log.info("False")
-
-        sys.exit(iRet) 
-
+        
     except Exception as inst:
         print('-----------------------------------------------------------------')
         print(type(inst))
@@ -444,3 +583,8 @@ else:
         print(inst)
         print('-----------------------------------------------------------------')
         raise
+    finally:
+        if conn is not None:
+            conn.close()
+        
+        sys.exit(iRet) 

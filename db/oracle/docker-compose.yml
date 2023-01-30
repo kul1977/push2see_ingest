@@ -1,0 +1,15 @@
+# Use system/oracle as user/password credentials
+# user : system Role: Normal
+version: '3.1'
+
+services:
+  db:
+    image: oracleinanutshell/oracle-xe-11g:latest
+    restart: always
+    environment:
+      ORACLE_CHARACTERSET: TH8TISASCII
+      ORACLE_DISABLE_ASYNCH_IO: true
+      ORACLE_ENABLE_XDB: true
+    ports:
+      - 1521:1521
+      - 8081:8080
