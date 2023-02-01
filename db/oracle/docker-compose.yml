@@ -1,5 +1,7 @@
 # Use system/oracle as user/password credentials
 # user : system Role: Normal
+# web interface URL : http://localhost:8081/apex/apex_admin (ADMIN/admin)
+# web interface URL : http://localhost:8081/apex/f?p=4950:1:2117305394459763 (system/oracle)
 version: '3.1'
 
 services:
