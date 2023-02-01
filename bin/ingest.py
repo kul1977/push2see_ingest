@@ -122,8 +122,14 @@ def _db_create_db(db_conn,sql_create_db) :
         log.error(f"Error connecting to MariaDB Platform: {e}")
         sys.exit(1)                
     except cx_Oracle.Error as e:
-        log.error(f"Error connecting to Oracle Platform: {e}")
-        sys.exit(1)                   
+        (error,) = e.args
+
+        if error.code == 1920 or error.code == 1918:
+            log.warning("Warning Oracle Code ORA-{0:05d} and Skiped".format(error.code))
+        else:
+            log.error(f"Error connecting to Oracle Platform: {e}")
+            log.error("Error connecting to Oracle Platform: {}".format(error.code))
+            sys.exit(1)                   
     except Exception as e:
         log.error('Other error {} {}'.format(type(e),e))
         # _usage(sys.argv)
@@ -151,8 +157,15 @@ def _db_create_tb(db_conn,sql_create_tb) :
         log.error(f"Error connecting to MariaDB Platform: {e}")
         sys.exit(1)                
     except cx_Oracle.Error as e:
-        log.error(f"Error connecting to Oracle Platform: {e}")
-        sys.exit(1)                     
+        (error,) = e.args
+
+        if error.code == 955:            
+            log.warning("Warning Oracle Code ORA-{0:05d} and Skiped".format(error.code))
+        else:
+            log.error(f"Error connecting to Oracle Platform: {e}")
+            log.error("Error connecting to Oracle Platform: {}".format(error.code))
+            sys.exit(1)                   
+
     except Exception as e:
         log.error('Other error {} {}'.format(type(e),e))
         # _usage(sys.argv)
@@ -186,7 +199,7 @@ def _db_delete_tb(db_conn,sql_delete_tb) :
         # _usage(sys.argv)
         sys.exit(2)                
 
-def _db_ingest_file(db_conn,sql_bulk_load) :
+def _db_ingest_file(db_conn,sql_bulk_load,sql_delete_tailer) :
     """
     Args:
         :param db_conn: database connection
@@ -194,22 +207,28 @@ def _db_ingest_file(db_conn,sql_bulk_load) :
         :returns: number of record
             
     >>> _db_create_tb(_db_connect('Mariadb','127.0.0.1','root','example',3306),"CREATE TABLE IF NOT EXISTS STG_DB.TEST (test int);")
-    >>> _db_ingest_file(_db_connect('Mariadb','127.0.0.1','root','example',3306),SQL_BLUK_LOAD)
+    >>> _db_ingest_file(_db_connect('Mariadb','127.0.0.1','root','example',3306),SQL_BLUK_LOAD,None)
     10
     >>> _db_create_db(_db_connect('Mariadb','127.0.0.1','root','example',3306),"DROP DATABASE IF EXISTS STG_DB;")
-
-    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE USER STG_TEST_1 IDENTIFIED BY password")    
-    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"GRANT UNLIMITED TABLESPACE TO STG_TEST_1")    
-    >>> _db_create_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE TABLE STG_TEST_1.TEST(test int)")
-    >>> _db_delete_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"TRUNCATE TABLE STG_TEST_1.TEST")
-    >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"DROP USER STG_TEST_1 CASCADE")
     """    
 
     try:            
         db_conn.execute(sql_bulk_load)
-        log.info("{:0,.0f} record(s) on RowCount".format(db_conn.rowcount))
+        
+        ingest_record = db_conn.rowcount
+        delete_tailer = 0
 
-        return db_conn.rowcount
+        # delete tailer record
+        if sql_delete_tailer != None:
+            db_conn.execute(sql_delete_tailer)
+            delete_tailer = db_conn.rowcount
+
+            log.info("{:0,.0f} tailer record(s) deleted".format(delete_tailer))
+
+        ingest_record = ingest_record - delete_tailer
+        log.info("{:0,.0f} record(s) on RowCount".format(ingest_record))
+
+        return ingest_record
     except mariadb.Error as e:
         log.error(f"Error MariaDB Platform: {e}")
         sys.exit(1)                
@@ -227,39 +246,31 @@ def _db_ingest_records(db_conn,sql_bulk_load,DataFrame) :
             
     >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE USER STG_TEST_1 IDENTIFIED BY password")    
     >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"GRANT UNLIMITED TABLESPACE TO STG_TEST_1")    
-    >>> _db_create_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE TABLE STG_TEST_1.TEST(test int)")
+    >>> _db_create_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"CREATE TABLE STG_TEST_1.TEST(test varchar(255))")
     >>> _db_delete_tb(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"TRUNCATE TABLE STG_TEST_1.TEST")
+    >>> _db_ingest_records(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"INSERT INTO STG_TEST_1.TEST (test) VALUES (:0)",test_df)
+    10
     >>> _db_create_db(_db_connect('Oracle','127.0.0.1:1521/xe','system','oracle',1521),"DROP USER STG_TEST_1 CASCADE")
     """    
 
-    try:            
+    try:
+        # Convert all columns to string
+        # DataFrame = DataFrame.astype(str)
+
         # Creating a list of tupples from the dataframe values
         tpls = [tuple(x) for x in DataFrame.to_numpy()]
-
-        # print(sql_bulk_load)
+        
         db_conn.prepare(sql_bulk_load)
         db_conn.executemany(None,tpls)
-
-        # for i in DataFrame.index:
-        #     cols  = ','.join(list(DataFrame.columns))
-        #     vals  = [DataFrame.at[i,col] for col in list(DataFrame.columns)]
-        #     query = """
-        #             INSERT INTO STG_DB.CUSTOMER
-        #             (ID,NAME,CITY,ZIPCODE,BBAN,LOCALE,BANK_COUNTRY,IBAN,COUNTRY_CALLING_CODE,MSISDN,PHONE_NUMBER,PYFLOAT,ANDROID_PLATFORM_TOKEN)
-        #             VALUES
-        #             ('{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}')
-        #             """.format(vals[0],vals[1],vals[2],vals[3] ,vals[4] ,vals[5],vals[6],
-        #                        vals[7],vals[8],vals[9],vals[10],vals[11],vals[12])
-        #     db_conn.execute(query)        
         
-        # log.info("{:0,.0f} record(s) on RowCount".format(db_conn.rowcount))        
+        log.info("{:0,.0f} record(s) on RowCount".format(db_conn.rowcount))        
         return db_conn.rowcount
     except mariadb.Error as e:
         log.error(f"Error MariaDB Platform: {e}")
-        sys.exit(1)                
+        sys.exit(1)
     except cx_Oracle.Error as e:
         log.error(f"Error Oracle Platform: {e}")
-        sys.exit(1)                
+        sys.exit(1)
     except Exception as e:
         log.error('Other error {} {}'.format(type(e),e))
         # _usage(sys.argv)
@@ -292,7 +303,7 @@ def _db_connect(db_type,host_db,user_db,pass_db,port_db) :
                 user=user_db,
                 password=pass_db,
                 host=host_db,
-                port=port_db,
+                port=int(port_db),
                 autocommit=True,
                 local_infile = 1
                 # database=stg_db
@@ -381,6 +392,10 @@ if __name__ == "__main__" and MODE == "Unit Test":
     config = configparser.ConfigParser()
     config.read("conf\config.ini")
     SQL_BLUK_LOAD = config["Mariadb"]['SQL_BLUK_LOAD']
+
+    # Create DataFrame
+    INPUT_PATH = config['Golbal']['INPUT_PATH']
+    test_df = pd.read_csv(INPUT_PATH + "\\TEST.txt",dtype=str)
 
     SQL_BLUK_LOAD = SQL_BLUK_LOAD.replace("{STG_DATABASE}","STG_DB")
     SQL_BLUK_LOAD = SQL_BLUK_LOAD.replace("{STG_TABLE}","TEST")
@@ -472,13 +487,28 @@ else:
         SQL_BLUK_LOAD = config[DB_TYPE]['SQL_BLUK_LOAD']
 
         # read file to dataFrame
-        df = pd.read_csv(INPUT_PATH + "\\" + INPUT_FILENAME, sep = DELIMETER)
+        df = pd.read_csv(INPUT_PATH + "\\" + INPUT_FILENAME, sep = DELIMETER, dtype=str)
 
         if TAILER :
+            # get last row and first coluns
+            TAILER_COLUMN = df.columns[0]
+            TAILER_VALUE  = df[TAILER_COLUMN].values[-1:][0]
+
+            SQL_DELETE_TAILER = config[DB_TYPE]['SQL_DELETE_TAILER']
+            SQL_DELETE_TAILER = SQL_DELETE_TAILER.replace("{STG_DATABASE}",STG_DATABASE)
+            SQL_DELETE_TAILER = SQL_DELETE_TAILER.replace("{STG_TABLE}",STG_TABLE)
+            SQL_DELETE_TAILER = SQL_DELETE_TAILER.replace("{COL}",TAILER_COLUMN)
+            SQL_DELETE_TAILER = SQL_DELETE_TAILER.replace("{VALUE}",TAILER_VALUE)
+
+            log.info('Get Last row and columns {} = {}'.format(TAILER_COLUMN, TAILER_VALUE))
+            
             log.info('Remove last row because TAILER: {}'.format(TAILER))
             # remove tailer record
             df = df[:-1]
-
+        else:
+            TAILER_COLUMN = None
+            TAILER_VALUE  = None
+            SQL_DELETE_TAILER = None
 
         # iterating the columns
         list_cols_create_tb = ""
@@ -546,9 +576,11 @@ else:
         log.info('Delete records on table: {}.{}'.format(STG_DATABASE,STG_TABLE))
         _db_delete_tb(db_cur,SQL_TRUNCATE_DB)
 
+        # ingest data to table
         log.info('Loading file: {} into table: {}.{}'.format(INPUT_PATH + "\\" + INPUT_FILENAME,STG_DATABASE,STG_TABLE))
+
         if DB_TYPE == "Mariadb":            
-            number_of_record = _db_ingest_file(db_cur,SQL_BLUK_LOAD)
+            number_of_record = _db_ingest_file(db_cur,SQL_BLUK_LOAD,SQL_DELETE_TAILER)
         elif DB_TYPE == "Oracle":
             SQL_BLUK_LOAD = SQL_BLUK_LOAD.replace("{COLS}",list_cols_insert)
             SQL_BLUK_LOAD = SQL_BLUK_LOAD.replace("{VALUES}",list_values_insert)
