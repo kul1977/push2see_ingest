@@ -500,14 +500,14 @@ else:
             SQL_DELETE_TAILER = SQL_DELETE_TAILER.replace("{COL}",TAILER_COLUMN)
             SQL_DELETE_TAILER = SQL_DELETE_TAILER.replace("{VALUE}",TAILER_VALUE)
 
-            log.info('Get Last row and columns {} = {}'.format(TAILER_COLUMN, TAILER_VALUE))
+            log.info("Get Last row of columns {} = '{}'".format(TAILER_COLUMN, TAILER_VALUE))
             
             log.info('Remove last row because TAILER: {}'.format(TAILER))
+
             # remove tailer record
             df = df[:-1]
+
         else:
-            TAILER_COLUMN = None
-            TAILER_VALUE  = None
             SQL_DELETE_TAILER = None
 
         # iterating the columns
